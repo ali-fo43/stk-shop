@@ -301,7 +301,7 @@ app.post("/api/orders", async (req, res) => {
     const itemsJson = JSON.stringify(payloadItems);
 
     await pool.query(
-      "INSERT INTO orders (full_name, phone, email, address, notes, items, total_price) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      "INSERT INTO orders (full_name, phone, email, address, notes, itemsJson, total_price) VALUES ($1, $2, $3, $4, $5, $6, $7)",
       [String(fullName).trim(), String(phone).trim(), String(email).trim(), String(address).trim(), notes || '', itemsJson, total_price]
     );
 

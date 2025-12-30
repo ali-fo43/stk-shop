@@ -204,7 +204,12 @@ async function loadOrders() {
   }
 
   ordersList.innerHTML = orders.map(o => {
-    const items = JSON.parse(o.itemsJson);
+    let items;
+    try {
+      items = o.itemsJson ? JSON.parse(o.itemsJson) : { items: [] };
+    } catch {
+      items = { items: [] };
+    }
     const total = items.items.reduce((sum, it) => sum + Number(it.price), 0);
     return `
       <div class="card" data-order-id="${o.id}">
