@@ -165,7 +165,7 @@ app.get("/api/hoodies", async (req, res) => {
 app.post("/api/hoodies", requireAuth, upload.single("image"), async (req, res) => {
   try {
     const { name, description, price } = req.body ?? {};
-    if (!name || !price || !req.file) return res.status(400).json({ message: "Missing fields" });
+    if (!name || !price || !req.file) return res.status(400).json({ message: "Name, price, and image are required" });
 
     const image_path = `/uploads/${req.file.filename}`;
     await pool.query(
@@ -174,7 +174,14 @@ app.post("/api/hoodies", requireAuth, upload.single("image"), async (req, res) =
     );
 
     res.json({ message: "Hoodie added" });
-  } catch {
+  } catch (err) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: "Image too large. Max 5MB allowed." });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: "Invalid image type. Only PNG, JPEG, WebP allowed." });
+    }
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
