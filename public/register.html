@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Register • STAXLLC Hoodies</title>
+  <meta name="description" content="Register for a new customer account." />
+  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <img src="/assets/logo-light.png" alt="STAXLLC logo" />
+        <div>
+          <div class="title">STAXLLC Hoodies</div>
+          <div class="subtitle">Premium streetwear</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <h1>Join STAXLLC Hoodies</h1>
+      <p>Create your account to start ordering premium hoodies.</p>
+    </div>
+
+    <div class="panel login-panel">
+      <div class="name">Register</div>
+      <div class="muted">Create a new customer account.</div>
+      <div class="hr"></div>
+
+      <form id="registerForm" class="form">
+        <div class="field">
+          <label for="email">📧 Email Address</label>
+          <input id="email" name="email" type="email" placeholder="your@email.com" required />
+        </div>
+        <div class="field">
+          <label for="password">🔒 Password</label>
+          <input id="password" name="password" type="password" placeholder="••••••••" minlength="6" required />
+        </div>
+        <div class="field">
+          <label for="confirmPassword">🔒 Confirm Password</label>
+          <input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" minlength="6" required />
+        </div>
+        <div class="row" style="grid-column:1/-1">
+          <div class="small">Already have an account? <a href="/login.html">Login here</a></div>
+          <button class="btn primary" id="registerBtn" type="submit">Register</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="t" id="toastTitle"></div>
+    <div class="d" id="toastDesc"></div>
+  </div>
+
+  <script src="/register.js"></script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STAXLLC</title>
+  <meta name="description" content="Order premium hoodies online. Fast and simple." />
+  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <img src="/assets/logo-light.png" alt="STAXLLC logo" />
+        <div>
+          <div class="title">STAXLLC Hoodies</div>
+          <div class="subtitle">Premium streetwear • fast ordering</div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn danger" id="logoutBtn" type="button" style="display:none">Logout</button>
+        <a class="btn" href="/employee.html">Employee</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <h1>Choose your hoodie.</h1>
+      <p>Browse available hoodies and place your order. Prices and items are updated by our team in real-time.</p>
+    </div>
+
+    <div class="panel customer-panel">
+      <div class="row">
+        <div>
+          <div class="name">Catalog</div>
+          <div class="muted">Click "Add to Order" to include items in your order list.</div>
+        </div>
+        <span class="badge" id="countBadge">0 items</span>
+      </div>
+      <div class="hr"></div>
+      <div class="row" style="margin-bottom: 16px;">
+        <input id="searchInput" type="text" placeholder="Search hoodies..." style="flex: 1; margin-right: 10px;" />
+        <button class="btn" id="searchBtn" type="button">Search</button>
+      </div>
+      <div id="hoodiesGrid" class="grid"></div>
+    </div>
+
+    <div class="panel customer-panel">
+      <div class="row">
+        <div>
+          <div class="name">Your Order</div>
+          <div class="muted">Fill your info and submit. We'll contact you to confirm.</div>
+        </div>
+        <button class="btn danger" id="clearBtn" type="button">Clear</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="orderList" class="muted">No items yet.</div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <div class="name">Total: $<span id="totalPrice">0.00</span></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <form id="orderForm" class="form">
+        <div class="field">
+          <label for="fullName">👤 Full Name</label>
+          <input id="fullName" name="fullName" placeholder="Your full name" required />
+        </div>
+        <div class="field">
+          <label for="phone">📞 Phone Number</label>
+          <input id="phone" name="phone" type="tel" placeholder="+1 234 567 890" required />
+        </div>
+        <div class="field">
+          <label for="email">📧 Email Address</label>
+          <input id="email" name="email" type="email" placeholder="your@email.com" required />
+        </div>
+        <div class="field">
+          <label for="address">🏠 Delivery Address</label>
+          <input id="address" name="address" placeholder="City, street, building..." required />
+        </div>
+        <div class="field" style="grid-column:1/-1">
+          <label for="notes">📝 Notes (optional)</label>
+          <textarea id="notes" name="notes" placeholder="Sizes, colors, delivery notes..."></textarea>
+        </div>
+
+        <div class="row" style="grid-column:1/-1">
+          <div class="small">By ordering you agree to be contacted for confirmation.</div>
+          <button class="btn primary" id="submitBtn" type="submit">Submit Order</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="small" style="margin-top:16px;">
+      © <span id="year"></span> STAXLLC. All rights reserved. | Contact: info@staxllc.com | Fast shipping worldwide.
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="t" id="toastTitle"></div>
+    <div class="d" id="toastDesc"></div>
+  </div>
+
+  <script>
+    // Check if logged in
+    fetch("/api/auth/me").then(res => {
+      if (res.ok) {
+        document.getElementById("logoutBtn").style.display = "inline-block";
+      } else {
+        window.location.href = "/login.html";
+      }
+    }).catch(() => {
+      window.location.href = "/login.html";
+    });
+  </script>
+
+  <!-- Image Modal -->
+  <div id="imageModal" class="modal">
+    <div class="modal-backdrop" id="imageModalBackdrop"></div>
+    <div class="modal-content image-modal-content">
+      <div class="modal-header">
+        <h3 id="imageModalTitle">Hoodie Image</h3>
+        <button class="modal-close" id="imageModalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <img id="imageModalImg" src="" alt="Hoodie image" />
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

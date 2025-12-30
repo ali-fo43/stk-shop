@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login • STAXLLC Hoodies</title>
+  <meta name="description" content="Login to access STAXLLC Hoodies." />
+  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <img src="/assets/logo-light.png" alt="STAXLLC logo" />
+        <div>
+          <div class="title">STAXLLC Hoodies</div>
+          <div class="subtitle">Premium streetwear</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <h1>Welcome Back</h1>
+      <p>Sign in to your account to continue shopping premium hoodies.</p>
+    </div>
+
+    <div class="panel login-panel">
+      <div class="login-header">
+        <div class="login-icon">🔐</div>
+        <div class="name">Secure Login</div>
+        <div class="muted">Enter your credentials to access your account.</div>
+      </div>
+      <div class="hr"></div>
+
+      <form id="loginForm" class="form">
+        <div class="field">
+          <label for="email">📧 Email Address</label>
+          <input id="email" name="email" type="email" placeholder="your@email.com" required />
+        </div>
+        <div class="field">
+          <label for="password">🔒 Password</label>
+          <input id="password" name="password" type="password" placeholder="••••••••" required />
+        </div>
+        <div class="row" style="grid-column:1/-1; justify-content: space-between;">
+          <div class="small">
+            New customer? <a href="/register.html" style="color: var(--accent);">Register here</a>
+          </div>
+          <button class="btn primary" id="loginBtn" type="submit">
+            <span>Login</span>
+            <span style="margin-left: 8px;">→</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="t" id="toastTitle"></div>
+    <div class="d" id="toastDesc"></div>
+  </div>
+
+  <script src="/login.js"></script>
+</body>
+</html>
