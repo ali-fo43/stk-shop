@@ -167,10 +167,13 @@ app.post("/api/hoodies", requireAuth, upload.single("image"), async (req, res) =
     const { name, description, price } = req.body ?? {};
     if (!name || !price || !req.file) return res.status(400).json({ message: "Name, price, and image are required" });
 
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice <= 0) return res.status(400).json({ message: "Price must be a positive number" });
+
     const image_path = `/uploads/${req.file.filename}`;
     await pool.query(
       "INSERT INTO hoodies (name, description, price, image_path) VALUES ($1, $2, $3, $4)",
-      [String(name).trim(), description ? String(description).trim() : '', Number(price), image_path]
+      [String(name).trim(), description ? String(description).trim() : '', numPrice, image_path]
     );
 
     res.json({ message: "Hoodie added" });
