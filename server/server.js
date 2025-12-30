@@ -163,8 +163,15 @@ app.post("/api/auth/logout", (req, res) => {
 // ---------- Hoodies (public) ----------
 app.get("/api/hoodies", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM hoodies ORDER BY id DESC");
-    res.json(result.rows);
+    const result = await pool.query(`
+  SELECT
+    *,
+    image_path AS "imageUrl"
+  FROM hoodies
+  ORDER BY id DESC
+`);
+res.json(result.rows);
+
   } catch {
     res.status(500).json({ message: "DB error" });
   }
@@ -206,8 +213,15 @@ app.patch("/api/hoodies/:id", requireAuth, upload.single("image"), async (req, r
     const { name, price } = req.body ?? {};
 
     // Load current hoodie to delete old image if needed
-    const result = await pool.query("SELECT * FROM hoodies WHERE id=$1", [id]);
-    const rows = result.rows;
+    const result = await pool.query(`
+  SELECT
+    *,
+    image_path AS "imageUrl"
+  FROM hoodies
+  ORDER BY id DESC
+`);
+res.json(result.rows);
+
     if (!rows.length) return res.status(404).json({ message: "Not found" });
 
     const current = rows[0];
@@ -274,29 +288,33 @@ app.delete("/api/hoodies/:id", requireAuth, async (req, res) => {
 // ---------- Orders (employee/admin) ----------
 app.get("/api/orders", requireAuth, async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM orders ORDER BY id DESC");
+    const result = await pool.query(`
+      SELECT
+        id,
+        full_name AS "fullName",
+        email,
+        phone,
+        address,
+        notes,
+        items::text AS "itemsJson",
+        total_price,
+        created_at
+      FROM orders
+      ORDER BY id DESC
+    `);
     res.json(result.rows);
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "DB error" });
   }
 });
+
 app.post("/api/orders", async (req, res) => {
   try {
     const { fullName, phone, email, address, items, notes } = req.body ?? {};
-    
-    // Basic required field validation
+
     if (!fullName || !phone || !email || !address || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Missing required order data" });
-    }
-
-    // Validate email format
-    if (!validateEmail(email.trim())) {
-      return res.status(400).json({ message: "Invalid email address format" });
-    }
-
-    // Validate phone format
-    if (!validatePhone(phone.trim())) {
-      return res.status(400).json({ message: "Invalid phone number format" });
     }
 
     const payloadItems = items.map(i => ({
@@ -307,18 +325,30 @@ app.post("/api/orders", async (req, res) => {
 
     const total_price = payloadItems.reduce((sum, i) => sum + Number(i.price), 0);
 
-    const itemsJson = JSON.stringify(payloadItems);
+    // Employee page expects itemsJson, so store it as an object with {items:[...]}
+    const itemsJson = JSON.stringify({ items: payloadItems });
 
     await pool.query(
-      'INSERT INTO orders ("fullName", phone, email, address, notes, "itemsJson", total_price) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [String(fullName).trim(), String(phone).trim(), String(email).trim(), String(address).trim(), notes || '', itemsJson, total_price]
+      `INSERT INTO orders (full_name, phone, email, address, notes, items, total_price)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      [
+        String(fullName).trim(),
+        String(phone).trim(),
+        String(email).trim(),
+        String(address).trim(),
+        (notes || "").trim(),
+        itemsJson,
+        total_price
+      ]
     );
 
     res.json({ message: "Order received" });
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 app.delete("/api/orders/:id", requireAuth, async (req, res) => {
   try {

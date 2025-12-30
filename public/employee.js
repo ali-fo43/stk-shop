@@ -206,11 +206,11 @@ async function loadOrders() {
   ordersList.innerHTML = orders.map(o => {
     let items;
     try {
-      items = o.itemsJson ? JSON.parse(o.itemsJson) : { items: [] };
+      items = o.itemsJson ? JSON.parse(o.itemsJson) : [];
     } catch {
-      items = { items: [] };
+      items = [];
     }
-    const total = items.items.reduce((sum, it) => sum + Number(it.price), 0);
+    const total = items.reduce((sum, it) => sum + Number(it.price), 0);
     return `
       <div class="card" data-order-id="${o.id}">
         <div class="card-body">
@@ -220,7 +220,7 @@ async function loadOrders() {
           </div>
           <div class="muted">${escapeHtml(o.phone)} • ${escapeHtml(o.email)}</div>
           <div class="muted">${escapeHtml(o.address)}</div>
-          <div class="small">Items: ${items.items.map(it => escapeHtml(it.name)).join(", ")}</div>
+          <div class="small">Items: ${items.map(it => escapeHtml(it.name)).join(", ")}</div>
           ${o.notes ? `<div class="small">Notes: ${escapeHtml(o.notes)}</div>` : ""}
           <div class="row" style="margin-top:12px">
             <button class="btn success" type="button" data-deliver="${o.id}">Mark Delivered</button>
