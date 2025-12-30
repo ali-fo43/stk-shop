@@ -173,7 +173,7 @@ app.post("/api/hoodies", requireAuth, upload.single("image"), async (req, res) =
     const image_path = `/uploads/${req.file.filename}`;
     await pool.query(
       "INSERT INTO hoodies (name, description, price, image_path) VALUES ($1, $2, $3, $4)",
-      [String(name).trim(), description ? String(description).trim() : '', numPrice, image_path]
+      [String(name).trim(), description ? String(description).trim() : null, numPrice, image_path]
     );
 
     res.json({ message: "Hoodie added" });
