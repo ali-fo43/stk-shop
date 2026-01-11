@@ -91,6 +91,8 @@ function renderGrid(items) {
       <img src="${p.imageUrl}" alt="${escapeHtml(p.name)}" onclick="openImageModal('${p.imageUrl}', '${escapeHtml(p.name)}')" style="cursor: pointer;" />
       <div class="card-body">
         <div class="name">${escapeHtml(p.name)}</div>
+        ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ''}
+        ${p.price ? `<div class="price">$${parseFloat(p.price).toFixed(2)}</div>` : ''}
       </div>
     </div>
   `).join("");

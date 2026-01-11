@@ -12,6 +12,7 @@ CREATE TABLE photos (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   image_path VARCHAR(255),
+  price DECIMAL(10,2),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

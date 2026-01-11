@@ -70,6 +70,14 @@
           <label>Name</label>
           <input name="name" placeholder="Photo name" required />
         </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea name="description" placeholder="Photo description"></textarea>
+        </div>
+        <div class="field">
+          <label>Price ($)</label>
+          <input name="price" type="number" step="0.01" placeholder="0.00" />
+        </div>
         <div class="field" style="grid-column:1/-1">
           <label>Image (PNG/JPG/WEBP, max 2MB)</label>
           <input name="image" type="file" accept="image/png,image/jpeg,image/webp" required />
@@ -118,6 +126,16 @@
       <div class="field">
         <label>Name</label>
         <input name="name" id="editName" required />
+      </div>
+
+      <div class="field">
+        <label>Description</label>
+        <textarea name="description" id="editDescription"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Price ($)</label>
+        <input name="price" id="editPrice" type="number" step="0.01" />
       </div>
 
       <div class="field" style="grid-column:1/-1">

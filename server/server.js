@@ -158,6 +158,7 @@ app.get("/api/photos", async (req, res) => {
       name: row.name,
       description: row.description,
       imageUrl: row.image_path,
+      price: row.price,
       created_at: row.created_at,
       updated_at: row.updated_at
     }));
@@ -170,7 +171,7 @@ app.get("/api/photos", async (req, res) => {
 // ---------- Photos (employee/admin) ----------
 app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) => {
   try {
-    const { name, description } = req.body ?? {};
+    const { name, description, price } = req.body ?? {};
     if (!name || !req.file) return res.status(400).json({ message: "Name and image are required" });
 
     // Upload to Supabase Storage
@@ -194,8 +195,8 @@ app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) =>
     const image_path = urlData.publicUrl;
 
     await pool.query(
-      "INSERT INTO photos (name, description, image_path) VALUES ($1, $2, $3)",
-      [String(name).trim(), description ? String(description).trim() : null, image_path]
+      "INSERT INTO photos (name, description, image_path, price) VALUES ($1, $2, $3, $4)",
+      [String(name).trim(), description ? String(description).trim() : null, image_path, price ? parseFloat(price) : null]
     );
 
     res.json({ message: "Photo added" });
@@ -216,7 +217,7 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
 
-    const { name } = req.body ?? {};
+    const { name, description, price } = req.body ?? {};
 
     // Load current photo to delete old image if needed
     const result = await pool.query("SELECT * FROM photos WHERE id=$1", [id]);
@@ -232,6 +233,16 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
     if (name && String(name).trim().length > 0) {
       fields.push(`name=$${paramIndex++}`);
       values.push(String(name).trim());
+    }
+
+    if (description !== undefined) {
+      fields.push(`description=$${paramIndex++}`);
+      values.push(description ? String(description).trim() : null);
+    }
+
+    if (price !== undefined && price !== '') {
+      fields.push(`price=$${paramIndex++}`);
+      values.push(parseFloat(price));
     }
 
     if (req.file) {

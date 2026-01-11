@@ -13,6 +13,8 @@ const editForm = document.getElementById("editForm");
 const editSaveBtn = document.getElementById("editSaveBtn");
 const editId = document.getElementById("editId");
 const editName = document.getElementById("editName");
+const editDescription = document.getElementById("editDescription");
+const editPrice = document.getElementById("editPrice");
 const editImage = document.getElementById("editImage");
 const editHint = document.getElementById("editHint");
 
@@ -40,6 +42,8 @@ function escapeHtml(s) {
 function openEditModal(photo) {
   editId.value = photo.id;
   editName.value = photo.name;
+  editDescription.value = photo.description || '';
+  editPrice.value = photo.price || '';
   editImage.value = "";
   editHint.textContent = `Editing: ${photo.name}`;
   editModal.classList.add("show");
@@ -163,6 +167,8 @@ async function loadPhotos() {
       <img src="${p.imageUrl}" alt="${escapeHtml(p.name)}" onclick="openImageModal('${p.imageUrl}', '${escapeHtml(p.name)}')" style="cursor: pointer;" />
       <div class="card-body">
         <div class="name">${escapeHtml(p.name)}</div>
+        ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ''}
+        ${p.price ? `<div class="price">$${parseFloat(p.price).toFixed(2)}</div>` : ''}
 
         <div class="row" style="margin-top:12px">
           <button class="btn primary" type="button" data-edit="${p.id}">Edit</button>
@@ -203,6 +209,8 @@ editForm.addEventListener("submit", async (e) => {
   const id = editId.value;
   const fd = new FormData();
   fd.append("name", editName.value);
+  fd.append("description", editDescription.value);
+  fd.append("price", editPrice.value);
 
   if (editImage.files && editImage.files[0]) {
     fd.append("image", editImage.files[0]);
