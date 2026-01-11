@@ -125,14 +125,6 @@ logoutBtn.addEventListener("click", async () => {
   checkAuth();
 });
 
-refreshOrdersBtn.addEventListener("click", loadOrders);
-
-toggleArchivedBtn.addEventListener("click", () => {
-  const isHidden = archivedContainer.style.display === "none";
-  archivedContainer.style.display = isHidden ? "block" : "none";
-  toggleArchivedBtn.textContent = isHidden ? "Toggle Archived ▲" : "Toggle Archived ▼";
-});
-
 addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const fd = new FormData(addForm);
