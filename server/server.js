@@ -6,11 +6,12 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import Database from 'better-sqlite3';
+import { createClient } from '@supabase/supabase-js';
+import pg from 'pg';
 
+import { pool } from "./db.js";
 import { requireAuth } from "./middleware.js";
 
 dotenv.config();
@@ -18,33 +19,9 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database('stk_shop.db');
-db.pragma('journal_mode = WAL');
-
-// Create tables if not exist
-db.exec(`
-  CREATE TABLE IF NOT EXISTS customers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS photos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT,
-    image_path TEXT,
-    price REAL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const publicDir = path.join(__dirname, "..", "public");
-
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 const app = express();
 
@@ -76,8 +53,6 @@ app.use(
 
 // serve frontend
 app.use(express.static(publicDir));
-// serve uploads
-app.use('/uploads', express.static(uploadsDir));
 
 // ---------- Multer for photo image upload ----------
 // Use memory storage since we'll upload to Supabase Storage
@@ -122,13 +97,13 @@ app.post("/api/auth/register", async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, 10);
-    const stmt = db.prepare("INSERT INTO customers (email, password_hash) VALUES (?, ?)");
-    stmt.run(email, hash);
+    await pool.query("INSERT INTO customers (email, password_hash) VALUES ($1, $2)", [email.trim(), hash]);
     res.json({ message: "Customer registered successfully" });
   } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (err.code === '23505') { // PostgreSQL unique violation
       res.status(400).json({ message: "Email already exists" });
     } else {
+      console.error(err);
       res.status(500).json({ message: "Registration failed" });
     }
   }
@@ -146,8 +121,8 @@ app.post("/api/auth/login", async (req, res) => {
     return res.json({ message: "Admin logged in" });
   } else {
     // Customer login - check DB
-    const stmt = db.prepare("SELECT password_hash FROM customers WHERE email = ?");
-    const row = stmt.get(email);
+    const result = await pool.query("SELECT password_hash FROM customers WHERE email = $1", [email.trim()]);
+    const row = result.rows[0];
     if (!row) return res.status(401).json({ message: "Customer not found. Please register first." });
 
     const ok = await bcrypt.compare(password, row.password_hash);
@@ -171,20 +146,19 @@ app.post("/api/auth/logout", (req, res) => {
 // ---------- Photos (public) ----------
 app.get("/api/photos", async (req, res) => {
   try {
-    const stmt = db.prepare("SELECT * FROM photos ORDER BY id DESC");
-    const rows = stmt.all();
+    const result = await pool.query("SELECT * FROM photos ORDER BY id DESC");
+    const rows = result.rows;
     const photos = rows.map(row => ({
       id: row.id,
       name: row.name,
       description: row.description,
-      imageUrl: `/uploads/${row.image_path}`,
+      imageUrl: row.image_path,
       price: row.price,
       created_at: row.created_at,
       updated_at: row.updated_at
     }));
     res.json(photos);
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ message: "DB error" });
   }
 });
@@ -195,15 +169,31 @@ app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) =>
     const { name, description, price } = req.body ?? {};
     if (!name || !req.file) return res.status(400).json({ message: "Name and image are required" });
 
-    // Save to local uploads
-    const fileName = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const filePath = path.join(uploadsDir, fileName);
-    fs.writeFileSync(filePath, req.file.buffer);
+    // Upload to Supabase Storage
+    const fileName = `${Date.now()}-${req.file.originalname}`;
+    const { data, error } = await supabase.storage
+      .from("hoodies")
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
 
-    const image_path = fileName;
+    if (error) {
+      console.error("Supabase upload error:", error);
+      return res.status(500).json({ message: "Upload failed" });
+    }
 
-    const stmt = db.prepare("INSERT INTO photos (name, description, image_path, price) VALUES (?, ?, ?, ?)");
-    stmt.run(name.trim(), description ? description.trim() : null, image_path, price ? parseFloat(price) : null);
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("hoodies")
+      .getPublicUrl(fileName);
+
+    const image_path = urlData.publicUrl;
+
+    // Insert into database
+    const result = await pool.query(
+      "INSERT INTO photos (name, description, image_path, price) VALUES ($1, $2, $3, $4) RETURNING id",
+      [name.trim(), description ? description.trim() : null, image_path, price ? parseFloat(price) : null]
+    );
 
     res.json({ message: "Photo added" });
   } catch (err) {
@@ -214,7 +204,7 @@ app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) =>
       return res.status(400).json({ message: "Invalid image type. Only PNG, JPEG, WebP allowed." });
     }
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "DB error" });
   }
 });
 
@@ -226,8 +216,8 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
     const { name, description, price } = req.body ?? {};
 
     // Load current photo
-    const stmt = db.prepare("SELECT * FROM photos WHERE id = ?");
-    const current = stmt.get(id);
+    const result = await pool.query("SELECT * FROM photos WHERE id = $1", [id]);
+    const current = result.rows[0];
     if (!current) return res.status(404).json({ message: "Not found" });
 
     const updates = {};
@@ -236,17 +226,30 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
     if (price !== undefined && price !== '') updates.price = parseFloat(price);
 
     if (req.file) {
-      // Save new image locally
-      const fileName = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const filePath = path.join(uploadsDir, fileName);
-      fs.writeFileSync(filePath, req.file.buffer);
+      // Upload new image to Supabase Storage
+      const fileName = `${Date.now()}-${req.file.originalname}`;
+      const { data, error } = await supabase.storage
+        .from("hoodies")
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+        });
 
-      updates.image_path = fileName;
+      if (error) {
+        console.error("Supabase upload error:", error);
+        return res.status(500).json({ message: "Upload failed" });
+      }
 
-      // Delete old image
-      if (current.image_path) {
-        const oldPath = path.join(uploadsDir, current.image_path);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("hoodies")
+        .getPublicUrl(fileName);
+
+      updates.image_path = urlData.publicUrl;
+
+      // Delete old image from Supabase (if it's a Supabase URL)
+      if (current.image_path && current.image_path.includes('supabase')) {
+        const oldFileName = current.image_path.split('/').pop();
+        await supabase.storage.from("hoodies").remove([oldFileName]);
       }
     }
 
@@ -254,17 +257,16 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
       return res.status(400).json({ message: "Nothing to update" });
     }
 
-    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');
     const values = Object.values(updates);
     values.push(id);
 
-    const updateStmt = db.prepare(`UPDATE photos SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
-    updateStmt.run(...values);
+    await pool.query(`UPDATE photos SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`, values);
 
     res.json({ message: "Photo updated" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "DB error" });
   }
 });
 
@@ -274,24 +276,23 @@ app.delete("/api/photos/:id", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
 
-    const stmt = db.prepare("SELECT image_path FROM photos WHERE id = ?");
-    const row = stmt.get(id);
+    const result = await pool.query("SELECT image_path FROM photos WHERE id = $1", [id]);
+    const row = result.rows[0];
     if (!row) return res.status(404).json({ message: "Not found" });
 
-    // Delete image file
-    if (row.image_path) {
-      const filePath = path.join(uploadsDir, row.image_path);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Delete image from Supabase storage
+    if (row.image_path && row.image_path.includes('supabase')) {
+      const fileName = row.image_path.split('/').pop();
+      await supabase.storage.from("hoodies").remove([fileName]);
     }
 
     // Delete from database
-    const deleteStmt = db.prepare("DELETE FROM photos WHERE id = ?");
-    deleteStmt.run(id);
+    await pool.query("DELETE FROM photos WHERE id = $1", [id]);
 
     res.json({ message: "Photo deleted" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "DB error" });
   }
 });
 
