@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>STAXLLC</title>
-  <meta name="description" content="Order premium hoodies online. Fast and simple." />
+  <meta name="description" content="View premium photos online. Fast and simple." />
   <link rel="icon" href="/assets/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +17,8 @@
       <div class="brand">
         <img src="/assets/logo-light.png" alt="STAXLLC logo" />
         <div>
-          <div class="title">STAXLLC Hoodies</div>
-          <div class="subtitle">Premium streetwear • fast ordering</div>
+          <div class="title">STAXLLC Photos</div>
+          <div class="subtitle">Premium photo gallery • fast access</div>
         </div>
       </div>
       <div class="row">
@@ -30,78 +30,27 @@
 
   <div class="container">
     <div class="hero">
-      <h1>Choose your hoodie.</h1>
-      <p>Browse available hoodies and place your order. Prices and items are updated by our team in real-time.</p>
+      <h1>View our photos.</h1>
+      <p>Browse available photos uploaded by our team.</p>
     </div>
 
     <div class="panel customer-panel">
       <div class="row">
         <div>
-          <div class="name">Catalog</div>
-          <div class="muted">Click "Add to Order" to include items in your order list.</div>
+          <div class="name">Photo Gallery</div>
+          <div class="muted">Click on photos to view them in full size.</div>
         </div>
-        <span class="badge" id="countBadge">0 items</span>
       </div>
       <div class="hr"></div>
       <div class="row" style="margin-bottom: 16px;">
-        <input id="searchInput" type="text" placeholder="Search hoodies..." style="flex: 1; margin-right: 10px;" />
+        <input id="searchInput" type="text" placeholder="Search photos..." style="flex: 1; margin-right: 10px;" />
         <button class="btn" id="searchBtn" type="button">Search</button>
       </div>
-      <div id="hoodiesGrid" class="grid"></div>
-    </div>
-
-    <div class="panel customer-panel">
-      <div class="row">
-        <div>
-          <div class="name">Your Order</div>
-          <div class="muted">Fill your info and submit. We'll contact you to confirm.</div>
-        </div>
-        <button class="btn danger" id="clearBtn" type="button">Clear</button>
-      </div>
-
-      <div class="hr"></div>
-
-      <div id="orderList" class="muted">No items yet.</div>
-
-      <div class="hr"></div>
-
-      <div class="row">
-        <div class="name">Total: $<span id="totalPrice">0.00</span></div>
-      </div>
-
-      <div class="hr"></div>
-
-      <form id="orderForm" class="form">
-        <div class="field">
-          <label for="fullName">👤 Full Name</label>
-          <input id="fullName" name="fullName" placeholder="Your full name" required />
-        </div>
-        <div class="field">
-          <label for="phone">📞 Phone Number</label>
-          <input id="phone" name="phone" type="tel" placeholder="+1 234 567 890" required />
-        </div>
-        <div class="field">
-          <label for="email">📧 Email Address</label>
-          <input id="email" name="email" type="email" placeholder="your@email.com" required />
-        </div>
-        <div class="field">
-          <label for="address">🏠 Delivery Address</label>
-          <input id="address" name="address" placeholder="City, street, building..." required />
-        </div>
-        <div class="field" style="grid-column:1/-1">
-          <label for="notes">📝 Notes (optional)</label>
-          <textarea id="notes" name="notes" placeholder="Sizes, colors, delivery notes..."></textarea>
-        </div>
-
-        <div class="row" style="grid-column:1/-1">
-          <div class="small">By ordering you agree to be contacted for confirmation.</div>
-          <button class="btn primary" id="submitBtn" type="submit">Submit Order</button>
-        </div>
-      </form>
+      <div id="photosGrid" class="grid"></div>
     </div>
 
     <div class="small" style="margin-top:16px;">
-      © <span id="year"></span> STAXLLC. All rights reserved. | Contact: info@staxllc.com | Fast shipping worldwide.
+      © <span id="year"></span> STAXLLC. All rights reserved. | Contact: info@staxllc.com
     </div>
   </div>
 
@@ -110,32 +59,23 @@
     <div class="d" id="toastDesc"></div>
   </div>
 
-  <script>
-    // Check if logged in
-    fetch("/api/auth/me").then(res => {
-      if (res.ok) {
-        document.getElementById("logoutBtn").style.display = "inline-block";
-      } else {
-        window.location.href = "/login.html";
-      }
-    }).catch(() => {
-      window.location.href = "/login.html";
-    });
-  </script>
-
   <!-- Image Modal -->
   <div id="imageModal" class="modal">
     <div class="modal-backdrop" id="imageModalBackdrop"></div>
     <div class="modal-content image-modal-content">
       <div class="modal-header">
-        <h3 id="imageModalTitle">Hoodie Image</h3>
+        <h3 id="imageModalTitle">Photo</h3>
         <button class="modal-close" id="imageModalClose">×</button>
       </div>
       <div class="modal-body">
-        <img id="imageModalImg" src="" alt="Hoodie image" />
+        <img id="imageModalImg" src="" alt="Photo" />
       </div>
     </div>
   </div>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
 
   <script src="/app.js"></script>
 </body>

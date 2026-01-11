@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Employee • STAXLLC Hoodies</title>
+  <title>Employee • STAXLLC Photos</title>
   <link rel="icon" href="/assets/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@
         <img src="/assets/logo-light.png" alt="STAXLLC logo" />
         <div>
           <div class="title">STAXLLC Employee</div>
-          <div class="subtitle">Secure inventory management</div>
+          <div class="subtitle">Secure photo management</div>
         </div>
       </div>
       <div class="row">
@@ -30,7 +30,7 @@
   <div class="container">
     <div class="hero">
       <h1>Employee Dashboard</h1>
-      <p>Login to add hoodies, upload images, update prices, and remove items.</p>
+      <p>Login to add photos, upload images, and manage the gallery.</p>
     </div>
 
     <div class="panel employee-panel" id="loginPanel">
@@ -57,8 +57,8 @@
     <div class="panel employee-panel" id="dashPanel" style="display:none">
       <div class="row">
         <div>
-          <div class="name">Add Hoodie</div>
-          <div class="muted">Upload an image, set the name and price.</div>
+          <div class="name">Add Photo</div>
+          <div class="muted">Upload an image and set the name.</div>
         </div>
         <span class="badge" id="authBadge">Authorized</span>
       </div>
@@ -68,11 +68,7 @@
       <form id="addForm" class="form" enctype="multipart/form-data">
         <div class="field">
           <label>Name</label>
-          <input name="name" placeholder="Hoodie name" required />
-        </div>
-        <div class="field">
-          <label>Price (USD)</label>
-          <input name="price" type="number" step="0.01" placeholder="25.00" required />
+          <input name="name" placeholder="Photo name" required />
         </div>
         <div class="field" style="grid-column:1/-1">
           <label>Image (PNG/JPG/WEBP, max 2MB)</label>
@@ -80,7 +76,7 @@
         </div>
         <div class="row" style="grid-column:1/-1">
           <div class="small">Images are stored on the server.</div>
-          <button class="btn primary" type="submit">Add Hoodie</button>
+          <button class="btn primary" type="submit">Add Photo</button>
         </div>
       </form>
 
@@ -88,42 +84,13 @@
 
       <div class="row">
         <div>
-          <div class="name">Current Hoodies</div>
-          <div class="muted">Update price/name or delete.</div>
+          <div class="name">Current Photos</div>
+          <div class="muted">Update name or delete.</div>
         </div>
       </div>
 
       <div class="hr"></div>
-      <div id="hoodiesGrid" class="grid"></div>
-
-      <div class="hr"></div>
-
-      <div class="row">
-        <div>
-          <div class="name">Recent Orders</div>
-          <div class="muted">View and manage customer orders.</div>
-        </div>
-        <button class="btn" id="refreshOrders" type="button">Refresh</button>
-      </div>
-
-      <div class="hr"></div>
-      <div id="ordersList" class="grid" style="grid-template-columns: 1fr;"></div>
-
-      <div class="hr"></div>
-
-      <div class="row">
-        <div>
-          <div class="name">Archived Orders</div>
-          <div class="muted">Delivered orders.</div>
-        </div>
-        <button class="btn" id="toggleArchivedBtn" type="button">Toggle Archived ▼</button>
-      </div>
-
-      <div class="hr"></div>
-      <div id="archivedContainer" style="display: none;">
-        <div id="archivedList" class="grid" style="grid-template-columns: 1fr;"></div>
-      </div>
-    </div>
+      <div id="photosGrid" class="grid"></div>
   </div>
 
   <div class="toast" id="toast">
@@ -137,8 +104,8 @@
   <div class="modal-card">
     <div class="modal-head">
       <div>
-        <div class="title">Edit Hoodie</div>
-        <div class="subtitle">Update name, price, or replace the image.</div>
+        <div class="title">Edit Photo</div>
+        <div class="subtitle">Update name or replace the image.</div>
       </div>
       <button class="btn danger" type="button" id="editCloseBtn">Close</button>
     </div>
@@ -151,11 +118,6 @@
       <div class="field">
         <label>Name</label>
         <input name="name" id="editName" required />
-      </div>
-
-      <div class="field">
-        <label>Price (USD)</label>
-        <input name="price" id="editPrice" type="number" step="0.01" required />
       </div>
 
       <div class="field" style="grid-column:1/-1">
@@ -177,11 +139,11 @@
   <div class="modal-backdrop" id="imageModalBackdrop"></div>
   <div class="modal-content image-modal-content">
     <div class="modal-header">
-      <h3 id="imageModalTitle">Hoodie Image</h3>
+      <h3 id="imageModalTitle">Photo</h3>
       <button class="modal-close" id="imageModalClose">×</button>
     </div>
     <div class="modal-body">
-      <img id="imageModalImg" src="" alt="Hoodie image" />
+      <img id="imageModalImg" src="" alt="Photo" />
     </div>
   </div>
 </div>

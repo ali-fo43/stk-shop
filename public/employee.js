@@ -2,13 +2,8 @@ const loginPanel = document.getElementById("loginPanel");
 const dashPanel = document.getElementById("dashPanel");
 const loginForm = document.getElementById("loginForm");
 const addForm = document.getElementById("addForm");
-const grid = document.getElementById("hoodiesGrid");
-const ordersList = document.getElementById("ordersList");
-const archivedList = document.getElementById("archivedList");
-const archivedContainer = document.getElementById("archivedContainer");
-const toggleArchivedBtn = document.getElementById("toggleArchivedBtn");
+const grid = document.getElementById("photosGrid");
 const logoutBtn = document.getElementById("logoutBtn");
-const refreshOrdersBtn = document.getElementById("refreshOrders");
 
 // Modal elements
 const editModal = document.getElementById("editModal");
@@ -18,7 +13,6 @@ const editForm = document.getElementById("editForm");
 const editSaveBtn = document.getElementById("editSaveBtn");
 const editId = document.getElementById("editId");
 const editName = document.getElementById("editName");
-const editPrice = document.getElementById("editPrice");
 const editImage = document.getElementById("editImage");
 const editHint = document.getElementById("editHint");
 
@@ -43,12 +37,11 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function openEditModal(hoodie) {
-  editId.value = hoodie.id;
-  editName.value = hoodie.name;
-  editPrice.value = Number(hoodie.price).toFixed(2);
+function openEditModal(photo) {
+  editId.value = photo.id;
+  editName.value = photo.name;
   editImage.value = "";
-  editHint.textContent = `Editing: ${hoodie.name}`;
+  editHint.textContent = `Editing: ${photo.name}`;
   editModal.classList.add("show");
   editModal.setAttribute("aria-hidden", "false");
 }
@@ -95,8 +88,7 @@ async function checkAuth() {
     loginPanel.style.display = "none";
     dashPanel.style.display = "block";
     logoutBtn.style.display = "inline-block";
-    loadHoodies();
-    loadOrders();
+    loadPhotos();
     return true;
   }
   loginPanel.style.display = "block";
@@ -141,196 +133,67 @@ addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const fd = new FormData(addForm);
 
-  const res = await fetch("/api/hoodies", {
+  const res = await fetch("/api/photos", {
     method: "POST",
     body: fd
   });
 
   if (!res.ok) {
-    toast("Error", "Could not add hoodie. Check image size/type.");
+    toast("Error", "Could not add photo. Check image size/type.");
     return;
   }
 
   addForm.reset();
-  toast("Added", "Hoodie added successfully.");
-  loadHoodies();
+  toast("Added", "Photo added successfully.");
+  loadPhotos();
 });
 
-async function loadHoodies() {
+async function loadPhotos() {
   grid.innerHTML = `<div class="muted">Loading...</div>`;
-  const res = await fetch("/api/hoodies");
+  const res = await fetch("/api/photos");
   const items = await res.json();
 
   if (!Array.isArray(items) || items.length === 0) {
-    grid.innerHTML = `<div class="muted">No hoodies yet.</div>`;
+    grid.innerHTML = `<div class="muted">No photos yet.</div>`;
     return;
   }
 
-  grid.innerHTML = items.map(h => `
+  grid.innerHTML = items.map(p => `
     <div class="card">
-      <img src="${h.imageUrl}" alt="${escapeHtml(h.name)}" onclick="openImageModal('${h.imageUrl}', '${escapeHtml(h.name)}')" style="cursor: pointer;" />
+      <img src="${p.imageUrl}" alt="${escapeHtml(p.name)}" onclick="openImageModal('${p.imageUrl}', '${escapeHtml(p.name)}')" style="cursor: pointer;" />
       <div class="card-body">
-        <div class="row">
-          <div class="name">${escapeHtml(h.name)}</div>
-          <div class="price">$${Number(h.price).toFixed(2)}</div>
-        </div>
+        <div class="name">${escapeHtml(p.name)}</div>
 
         <div class="row" style="margin-top:12px">
-          <button class="btn primary" type="button" data-edit="${h.id}">Edit</button>
-          <button class="btn danger" type="button" data-del="${h.id}">Delete</button>
+          <button class="btn primary" type="button" data-edit="${p.id}">Edit</button>
+          <button class="btn danger" type="button" data-del="${p.id}">Delete</button>
         </div>
       </div>
     </div>
   `).join("");
 
   // Bind edit/delete buttons safely
-  items.forEach(h => {
-    const editBtn = grid.querySelector(`[data-edit="${h.id}"]`);
-    const delBtn = grid.querySelector(`[data-del="${h.id}"]`);
+  items.forEach(p => {
+    const editBtn = grid.querySelector(`[data-edit="${p.id}"]`);
+    const delBtn = grid.querySelector(`[data-del="${p.id}"]`);
 
-    editBtn.addEventListener("click", () => openEditModal(h));
-    delBtn.addEventListener("click", () => deleteHoodie(h.id));
+    editBtn.addEventListener("click", () => openEditModal(p));
+    delBtn.addEventListener("click", () => deletePhoto(p.id));
   });
 }
 
-async function loadOrders() {
-  ordersList.innerHTML = `<div class="muted">Loading...</div>`;
-  const res = await fetch("/api/orders");
-  const orders = await res.json();
 
-  if (!Array.isArray(orders) || orders.length === 0) {
-    ordersList.innerHTML = `<div class="muted">No orders yet.</div>`;
-    return;
-  }
 
-  ordersList.innerHTML = orders.map(o => {
-    let items;
-    try {
-      items = o.itemsJson ? JSON.parse(o.itemsJson) : [];
-    } catch {
-      items = [];
-    }
-    const total = items.reduce((sum, it) => sum + Number(it.price), 0);
-    return `
-      <div class="card" data-order-id="${o.id}">
-        <div class="card-body">
-          <div class="row">
-            <div class="name">${escapeHtml(o.fullName)}</div>
-            <div class="price">$${total.toFixed(2)}</div>
-          </div>
-          <div class="muted">${escapeHtml(o.phone)} • ${escapeHtml(o.email)}</div>
-          <div class="muted">${escapeHtml(o.address)}</div>
-          <div class="small">Items: ${items.map(it => escapeHtml(it.name)).join(", ")}</div>
-          ${o.notes ? `<div class="small">Notes: ${escapeHtml(o.notes)}</div>` : ""}
-          <div class="row" style="margin-top:12px">
-            <button class="btn success" type="button" data-deliver="${o.id}">Mark Delivered</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join("");
+async function deletePhoto(id) {
+  if (!confirm("Delete this photo?")) return;
 
-  // Bind deliver buttons
-  ordersList.querySelectorAll("[data-deliver]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const orderCard = btn.closest(".card");
-      const orderId = orderCard.dataset.orderId;
-      
-      // Update the card with archived buttons
-      orderCard.innerHTML = `
-        <div class="card-body">
-          ${orderCard.querySelector(".card-body").innerHTML}
-          <div class="row" style="margin-top:12px">
-            <button class="btn primary" type="button" data-restore="${orderId}">Restore to Orders</button>
-            <button class="btn danger" type="button" data-delete="${orderId}">Delete Permanently</button>
-          </div>
-        </div>
-      `;
-      
-      archivedList.appendChild(orderCard);
-      archivedContainer.style.display = "block";
-      toggleArchivedBtn.textContent = "Toggle Archived ▲";
-      toast("Archived", "Order marked as delivered.");
-      
-      // Bind new buttons
-      bindArchivedButtons();
-    });
-  });
-}
-
-function bindArchivedButtons() {
-  // Bind restore buttons
-  archivedList.querySelectorAll("[data-restore]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const orderCard = btn.closest(".card");
-      const orderId = orderCard.dataset.orderId;
-      
-      // Update the card with deliver button
-      const cardBody = orderCard.querySelector(".card-body");
-      const originalContent = cardBody.innerHTML.replace(
-        /<div class="row" style="margin-top:12px">\s*<button class="btn primary"[^>]*>Restore to Orders<\/button>\s*<button class="btn danger"[^>]*>Delete Permanently<\/button>\s*<\/div>/,
-        `<div class="row" style="margin-top:12px">
-            <button class="btn success" type="button" data-deliver="${orderId}">Mark Delivered</button>
-          </div>`
-      );
-      
-      orderCard.innerHTML = `<div class="card-body">${originalContent}</div>`;
-      ordersList.appendChild(orderCard);
-      toast("Restored", "Order restored to active orders.");
-      
-      // Re-bind deliver buttons
-      ordersList.querySelectorAll("[data-deliver]").forEach(deliverBtn => {
-        deliverBtn.addEventListener("click", () => {
-          const card = deliverBtn.closest(".card");
-          const id = card.dataset.orderId;
-          
-          const body = card.querySelector(".card-body");
-          body.innerHTML += `
-            <div class="row" style="margin-top:12px">
-              <button class="btn primary" type="button" data-restore="${id}">Restore to Orders</button>
-              <button class="btn danger" type="button" data-delete="${id}">Delete Permanently</button>
-            </div>
-          `;
-          
-          archivedList.appendChild(card);
-          archivedContainer.style.display = "block";
-          toggleArchivedBtn.textContent = "Toggle Archived ▲";
-          toast("Archived", "Order marked as delivered.");
-          bindArchivedButtons();
-        });
-      });
-    });
-  });
-  
-  // Bind delete buttons
-  archivedList.querySelectorAll("[data-delete]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const orderCard = btn.closest(".card");
-      const orderId = orderCard.dataset.orderId;
-      
-      if (!confirm("Are you sure you want to permanently delete this order?")) return;
-      
-      const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
-      if (res.ok) {
-        orderCard.remove();
-        toast("Deleted", "Order permanently deleted.");
-      } else {
-        toast("Error", "Failed to delete order.");
-      }
-    });
-  });
-}
-
-async function deleteHoodie(id) {
-  if (!confirm("Delete this hoodie?")) return;
-
-  const res = await fetch(`/api/hoodies/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/photos/${id}`, { method: "DELETE" });
   if (!res.ok) {
     toast("Error", "Delete failed.");
     return;
   }
-  toast("Deleted", "Hoodie removed.");
-  loadHoodies();
+  toast("Deleted", "Photo removed.");
+  loadPhotos();
 }
 
 // Save from the modal (supports optional new image)
@@ -340,7 +203,6 @@ editForm.addEventListener("submit", async (e) => {
   const id = editId.value;
   const fd = new FormData();
   fd.append("name", editName.value);
-  fd.append("price", editPrice.value);
 
   if (editImage.files && editImage.files[0]) {
     fd.append("image", editImage.files[0]);
@@ -348,7 +210,7 @@ editForm.addEventListener("submit", async (e) => {
 
   editSaveBtn.disabled = true;
 
-  const res = await fetch(`/api/hoodies/${id}`, {
+  const res = await fetch(`/api/photos/${id}`, {
     method: "PATCH",
     body: fd
   });
@@ -360,9 +222,9 @@ editForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  toast("Updated", "Hoodie updated successfully.");
+  toast("Updated", "Photo updated successfully.");
   closeEditModal();
-  loadHoodies();
+  loadPhotos();
 });
 
 checkAuth();
