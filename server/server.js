@@ -177,7 +177,7 @@ app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) =>
     // Upload to Supabase Storage
     const fileName = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { data, error } = await supabase.storage
-      .from('photos')
+      .from('hoodies')
       .upload(fileName, req.file.buffer, {
         contentType: req.file.mimetype,
       });
@@ -189,7 +189,7 @@ app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) =>
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('photos')
+      .from('hoodies')
       .getPublicUrl(fileName);
 
     const image_path = urlData.publicUrl;
@@ -274,7 +274,7 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
         const oldFileName = current.image_path.split('/').pop();
         if (oldFileName) {
           await supabase.storage
-            .from('photos')
+            .from('hoodies')
             .remove([oldFileName]);
         }
       }
