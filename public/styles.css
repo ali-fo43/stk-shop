@@ -668,60 +668,169 @@ textarea {
 
 /* IMAGE MODAL */
 .image-modal-content {
-  position: relative;
-  width: min(90vw, 800px);
-  margin: 40px auto 0;
-  border: 1px solid var(--line);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
   background: var(--card);
-  border-radius: var(--border-radius-large);
-  box-shadow: var(--shadow-hover);
+  border-radius: 0;
+  box-shadow: none;
   animation: modalSlideIn 0.3s ease-out;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .image-modal-content .modal-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--line);
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: rgba(0, 0, 0, 0.8);
+  flex-shrink: 0;
 }
 
 .image-modal-content .modal-header h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
+  color: white;
 }
 
 .image-modal-content .modal-close {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 40px;
   cursor: pointer;
-  color: var(--muted);
-  padding: 4px;
+  color: white;
+  padding: 4px 12px;
   border-radius: 4px;
   transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
 }
 
 .image-modal-content .modal-close:hover {
-  color: var(--text);
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .image-modal-content .modal-body {
   padding: 0;
   text-align: center;
   background: #000;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  position: relative;
 }
 
 .image-modal-content .modal-body img {
-  max-width: 100%;
-  max-height: 80vh;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
-  margin: 0 auto;
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
 }
+
+.image-modal-content .modal-body img.zoomed {
+  cursor: zoom-out;
+  transform: scale(2);
+}
+
+.image-modal-content .zoom-hint {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* CURRENT IMAGES GALLERY */
+.current-images-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--line);
+  min-height: 140px;
+}
+
+.current-images-gallery .image-item {
+  position: relative;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.current-images-gallery .image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.current-images-gallery .image-item img:hover {
+  transform: scale(1.05);
+}
+
+.current-images-gallery .image-item .delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(220, 53, 69, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.current-images-gallery .image-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.current-images-gallery .image-item .delete-btn:hover {
+  background: rgba(220, 53, 69, 1);
+  transform: scale(1.1);
+}
+
+.current-images-gallery .empty-msg {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  padding: 24px;
+  font-size: 0.9rem;
+}
+
 @supports not (backdrop-filter: blur(10px)) {
   .nav { background: rgba(11, 12, 16, 0.92); }
 }

@@ -15,8 +15,9 @@ const editId = document.getElementById("editId");
 const editName = document.getElementById("editName");
 const editDescription = document.getElementById("editDescription");
 const editPrice = document.getElementById("editPrice");
-const editImage = document.getElementById("editImage");
+const editImages = document.getElementById("editImages");
 const editHint = document.getElementById("editHint");
+const currentImagesGallery = document.getElementById("currentImagesGallery");
 
 // Image modal elements
 const imageModal = document.getElementById("imageModal");
@@ -44,10 +45,48 @@ function openEditModal(photo) {
   editName.value = photo.name;
   editDescription.value = photo.description || '';
   editPrice.value = photo.price || '';
-  editImage.value = "";
+  editImages.value = "";
   editHint.textContent = `Editing: ${photo.name}`;
+  
+  // Show current images with delete buttons
+  renderCurrentImages(photo.id, photo.images, photo.photoIds);
+  
   editModal.classList.add("show");
   editModal.setAttribute("aria-hidden", "false");
+}
+
+function renderCurrentImages(productId, images, photoIds) {
+  if (!images || images.length === 0) {
+    currentImagesGallery.innerHTML = '<div class="empty-msg">No images yet</div>';
+    return;
+  }
+
+  currentImagesGallery.innerHTML = images.map((img, index) => `
+    <div class="image-item">
+      <img src="${img}" alt="Product image ${index + 1}" style="cursor: pointer;" onclick="openImageModal('${img}', 'Product Image')" />
+      <button class="delete-btn" onclick="window.deleteImage(${productId}, ${photoIds[index]}); return false;" title="Delete image">×</button>
+    </div>
+  `).join('');
+}
+
+async function deleteImage(productId, photoId) {
+  if (!confirm("Delete this image?")) return;
+
+  const res = await fetch(`/api/products/${productId}/photos/${photoId}`, { method: "DELETE" });
+  if (!res.ok) {
+    toast("Error", "Could not delete image.");
+    return;
+  }
+
+  toast("Deleted", "Image removed.");
+  loadPhotos();
+  // Reload the edit modal with updated images
+  const photosResult = await fetch("/api/products");
+  const photos = await photosResult.json();
+  const currentPhoto = photos.find(p => p.id === productId);
+  if (currentPhoto) {
+    renderCurrentImages(productId, currentPhoto.images, currentPhoto.photoIds);
+  }
 }
 
 function closeEditModal() {
@@ -58,6 +97,7 @@ function closeEditModal() {
 function openImageModal(imageSrc, imageAlt) {
   imageModalImg.src = imageSrc;
   imageModalImg.alt = imageAlt;
+  imageModalImg.classList.remove('zoomed');
   imageModalTitle.textContent = imageAlt;
   imageModal.classList.add("show");
   imageModal.setAttribute("aria-hidden", "false");
@@ -66,11 +106,13 @@ function openImageModal(imageSrc, imageAlt) {
 function closeImageModal() {
   imageModal.classList.remove("show");
   imageModal.setAttribute("aria-hidden", "true");
+  imageModalImg.classList.remove('zoomed');
 }
 
 // Make functions globally accessible
 window.openImageModal = openImageModal;
 window.closeImageModal = closeImageModal;
+window.deleteImage = deleteImage;
 
 editCloseBg.addEventListener("click", closeEditModal);
 editCloseBtn.addEventListener("click", closeEditModal);
@@ -78,6 +120,12 @@ editCloseBtn.addEventListener("click", closeEditModal);
 // Image modal event listeners
 imageModalBackdrop.addEventListener("click", closeImageModal);
 imageModalClose.addEventListener("click", closeImageModal);
+
+// Image zoom toggle
+imageModalImg.addEventListener('click', (e) => {
+  e.stopPropagation();
+  imageModalImg.classList.toggle('zoomed');
+});
 
 // Close image modal on Escape key
 document.addEventListener("keydown", (e) => {
@@ -129,24 +177,24 @@ addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const fd = new FormData(addForm);
 
-  const res = await fetch("/api/photos", {
+  const res = await fetch("/api/products", {
     method: "POST",
     body: fd
   });
 
   if (!res.ok) {
-    toast("Error", "Could not add photo. Check image size/type.");
+    toast("Error", "Could not add product. Check image size/type.");
     return;
   }
 
   addForm.reset();
-  toast("Added", "Photo added successfully.");
+  toast("Added", "Product added successfully.");
   loadPhotos();
 });
 
 async function loadPhotos() {
   grid.innerHTML = `<div class="muted">Loading...</div>`;
-  const res = await fetch("/api/photos");
+  const res = await fetch("/api/products");
   const items = await res.json();
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -156,11 +204,12 @@ async function loadPhotos() {
 
   grid.innerHTML = items.map(p => `
     <div class="card">
-      <img src="${p.imageUrl}" alt="${escapeHtml(p.name)}" onclick="openImageModal('${p.imageUrl}', '${escapeHtml(p.name)}')" style="cursor: pointer;" />
+      <img src="${p.images[0]}" alt="${escapeHtml(p.name)}" onclick="openImageModal('${p.images[0]}', '${escapeHtml(p.name)}')" style="cursor: pointer;" />
       <div class="card-body">
         <div class="name">${escapeHtml(p.name)}</div>
         ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ''}
         ${p.price ? `<div class="price">$${parseFloat(p.price).toFixed(2)}</div>` : ''}
+        <div class="small" style="margin:4px 0">${p.images.length} image${p.images.length > 1 ? 's' : ''}</div>
 
         <div class="row" style="margin-top:12px">
           <button class="btn primary" type="button" data-edit="${p.id}">Edit</button>
@@ -183,18 +232,18 @@ async function loadPhotos() {
 
 
 async function deletePhoto(id) {
-  if (!confirm("Delete this photo?")) return;
+  if (!confirm("Delete this product and all its images?")) return;
 
-  const res = await fetch(`/api/photos/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
   if (!res.ok) {
     toast("Error", "Delete failed.");
     return;
   }
-  toast("Deleted", "Photo removed.");
+  toast("Deleted", "Product removed.");
   loadPhotos();
 }
 
-// Save from the modal (supports optional new image)
+// Save from the modal (supports adding new images)
 editForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -204,13 +253,16 @@ editForm.addEventListener("submit", async (e) => {
   fd.append("description", editDescription.value);
   fd.append("price", editPrice.value);
 
-  if (editImage.files && editImage.files[0]) {
-    fd.append("image", editImage.files[0]);
+  if (editImages.files && editImages.files.length > 0) {
+    // Add multiple images
+    for (let i = 0; i < editImages.files.length; i++) {
+      fd.append("images", editImages.files[i]);
+    }
   }
 
   editSaveBtn.disabled = true;
 
-  const res = await fetch(`/api/photos/${id}`, {
+  const res = await fetch(`/api/products/${id}`, {
     method: "PATCH",
     body: fd
   });
@@ -222,7 +274,7 @@ editForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  toast("Updated", "Photo updated successfully.");
+  toast("Updated", "Product updated successfully.");
   closeEditModal();
   loadPhotos();
 });

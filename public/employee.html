@@ -79,12 +79,12 @@
           <input name="price" type="number" step="0.01" placeholder="0.00" />
         </div>
         <div class="field" style="grid-column:1/-1">
-          <label>Image (PNG/JPG/WEBP, max 2MB)</label>
-          <input name="image" type="file" accept="image/png,image/jpeg,image/webp" required />
+          <label>Images (PNG/JPG/WEBP, max 2MB each, up to 10 images)</label>
+          <input name="images" type="file" accept="image/png,image/jpeg,image/webp" multiple required />
         </div>
         <div class="row" style="grid-column:1/-1">
-          <div class="small">Images are stored on the server.</div>
-          <button class="btn primary" type="submit">Add Photo</button>
+          <div class="small">Images are stored on the server. First image will be the primary image.</div>
+          <button class="btn primary" type="submit">Add Product</button>
         </div>
       </form>
 
@@ -139,9 +139,16 @@
       </div>
 
       <div class="field" style="grid-column:1/-1">
-        <label>Replace Image (optional)</label>
-        <input name="image" id="editImage" type="file" accept="image/png,image/jpeg,image/webp" />
-        <div class="small">Leave empty to keep the current image.</div>
+        <label>Current Images</label>
+        <div id="currentImagesGallery" class="current-images-gallery"></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="field" style="grid-column:1/-1">
+        <label>Add More Images (optional)</label>
+        <input name="images" id="editImages" type="file" accept="image/png,image/jpeg,image/webp" multiple />
+        <div class="small">Upload additional images to add to this product. First uploaded image will become the primary.</div>
       </div>
 
       <div class="row" style="grid-column:1/-1">

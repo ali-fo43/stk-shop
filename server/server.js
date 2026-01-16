@@ -8,18 +8,15 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createClient } from '@supabase/supabase-js';
-import pg from 'pg';
+import fs from 'fs/promises';
 
-import { pool } from "./db.js";
+import { pool, testConnection } from "./db.js";
 import { requireAuth } from "./middleware.js";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const publicDir = path.join(__dirname, "..", "public");
 
@@ -28,6 +25,8 @@ const app = express();
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+app.use(express.static(publicDir));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Validation functions
 function validateEmail(email) {
@@ -51,12 +50,28 @@ app.use(
   })
 );
 
-// serve frontend
-app.use(express.static(publicDir));
+// Test database connection
+app.get("/api/test-db", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
+    const tables = result.rows.map(r => r.table_name);
+    res.json({ tables, photosCount: tables.includes('photos') ? 'Table exists' : 'Table missing' });
+  } catch (err) {
+    console.error("DB test error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ---------- Multer for photo image upload ----------
-// Use memory storage since we'll upload to Supabase Storage
-const storage = multer.memoryStorage();
+// Use disk storage for local uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.originalname}`);
+  }
+});
 
 function fileFilter(req, file, cb) {
   const ok = ["image/png", "image/jpeg", "image/webp"].includes(file.mimetype);
@@ -68,6 +83,9 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }
 });
+
+// Allow multiple image uploads (up to 10 images)
+const uploadMultiple = upload.array('images', 10);
 
 // ---------- Auth ----------
 const adminHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10);
@@ -100,7 +118,7 @@ app.post("/api/auth/register", async (req, res) => {
     await pool.query("INSERT INTO customers (email, password_hash) VALUES ($1, $2)", [email.trim(), hash]);
     res.json({ message: "Customer registered successfully" });
   } catch (err) {
-    if (err.code === '23505') { // PostgreSQL unique violation
+    if (err.code === 'ER_DUP_ENTRY') { // MySQL duplicate entry
       res.status(400).json({ message: "Email already exists" });
     } else {
       console.error(err);
@@ -143,60 +161,72 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ message: "Logged out" });
 });
 
-// ---------- Photos (public) ----------
-app.get("/api/photos", async (req, res) => {
+// ---------- Products (public) ----------
+app.get("/api/products", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM photos ORDER BY id DESC");
-    const rows = result.rows;
-    const photos = rows.map(row => ({
+    // Get all products
+    const productsResult = await pool.query(`
+      SELECT p.*, STRING_AGG(ph.image_path, ',' ORDER BY ph.sort_order, ph.id) as image_paths,
+             STRING_AGG(ph.id::text, ',' ORDER BY ph.sort_order, ph.id) as photo_ids
+      FROM products p
+      LEFT JOIN photos ph ON p.id = ph.product_id
+      GROUP BY p.id
+      ORDER BY p.id DESC
+    `);
+    const rows = productsResult.rows;
+
+    const products = rows.map(row => ({
       id: row.id,
       name: row.name,
       description: row.description,
-      imageUrl: row.image_path,
       price: row.price,
+      images: row.image_paths ? row.image_paths.split(',') : [],
+      photoIds: row.photo_ids ? row.photo_ids.split(',').map(id => parseInt(id)) : [],
       created_at: row.created_at,
       updated_at: row.updated_at
     }));
-    res.json(photos);
-  } catch {
+
+    res.json(products);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "DB error" });
   }
 });
 
-// ---------- Photos (employee/admin) ----------
-app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) => {
+// ---------- Products (employee/admin) ----------
+app.post("/api/products", requireAuth, uploadMultiple, async (req, res) => {
   try {
+    console.log("Upload attempt:", { name: req.body?.name, files: req.files ? req.files.length : 0 });
     const { name, description, price } = req.body ?? {};
-    if (!name || !req.file) return res.status(400).json({ message: "Name and image are required" });
-
-    // Upload to Supabase Storage
-    const fileName = `${Date.now()}-${req.file.originalname}`;
-    const { data, error } = await supabase.storage
-      .from("hoodies")
-      .upload(fileName, req.file.buffer, {
-        contentType: req.file.mimetype,
-      });
-
-    if (error) {
-      console.error("Supabase upload error:", error);
-      return res.status(500).json({ message: "Upload failed" });
+    if (!name || !req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "Name and at least one image are required" });
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from("hoodies")
-      .getPublicUrl(fileName);
-
-    const image_path = urlData.publicUrl;
-
-    // Insert into database
-    const result = await pool.query(
-      "INSERT INTO photos (name, description, image_path, price) VALUES ($1, $2, $3, $4) RETURNING id",
-      [name.trim(), description ? description.trim() : null, image_path, price ? parseFloat(price) : null]
+    // Insert product first
+    const productResult = await pool.query(
+      "INSERT INTO products (name, description, price) VALUES ($1, $2, $3) RETURNING id",
+      [name.trim(), description ? description.trim() : null, price ? parseFloat(price) : null]
     );
 
-    res.json({ message: "Photo added" });
+    const productId = productResult.rows[0].id;
+    console.log("Product inserted with ID:", productId);
+
+    // Insert photos
+    const photoPromises = req.files.map((file, index) => {
+      const imagePath = `/uploads/${file.filename}`;
+      const isPrimary = index === 0; // First image is primary
+      return pool.query(
+        "INSERT INTO photos (product_id, image_path, is_primary, sort_order) VALUES ($1, $2, $3, $4)",
+        [productId, imagePath, isPrimary, index]
+      );
+    });
+
+    await Promise.all(photoPromises);
+    console.log(`Inserted ${req.files.length} photos for product ${productId}`);
+
+    res.json({ message: "Product added successfully" });
   } catch (err) {
+    console.error("Upload error:", err);
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ message: "Image too large. Max 5MB allowed." });
     }
@@ -208,62 +238,51 @@ app.post("/api/photos", requireAuth, upload.single("image"), async (req, res) =>
   }
 });
 
-app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, res) => {
+app.patch("/api/products/:id", requireAuth, uploadMultiple, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
 
     const { name, description, price } = req.body ?? {};
 
-    // Load current photo
-    const result = await pool.query("SELECT * FROM photos WHERE id = $1", [id]);
-    const current = result.rows[0];
-    if (!current) return res.status(404).json({ message: "Not found" });
+    // Load current product
+    const productResult = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
+    const current = productResult.rows[0];
+    if (!current) return res.status(404).json({ message: "Product not found" });
 
     const updates = {};
     if (name && String(name).trim().length > 0) updates.name = String(name).trim();
     if (description !== undefined) updates.description = description ? String(description).trim() : null;
     if (price !== undefined && price !== '') updates.price = parseFloat(price);
 
-    if (req.file) {
-      // Upload new image to Supabase Storage
-      const fileName = `${Date.now()}-${req.file.originalname}`;
-      const { data, error } = await supabase.storage
-        .from("hoodies")
-        .upload(fileName, req.file.buffer, {
-          contentType: req.file.mimetype,
-        });
-
-      if (error) {
-        console.error("Supabase upload error:", error);
-        return res.status(500).json({ message: "Upload failed" });
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("hoodies")
-        .getPublicUrl(fileName);
-
-      updates.image_path = urlData.publicUrl;
-
-      // Delete old image from Supabase (if it's a Supabase URL)
-      if (current.image_path && current.image_path.includes('supabase')) {
-        const oldFileName = current.image_path.split('/').pop();
-        await supabase.storage.from("hoodies").remove([oldFileName]);
-      }
+    // Update product info
+    if (Object.keys(updates).length > 0) {
+      const keys = Object.keys(updates);
+      const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+      const values = Object.values(updates);
+      values.push(id);
+      await pool.query(`UPDATE products SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`, values);
     }
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: "Nothing to update" });
+    // Handle new photos if uploaded
+    if (req.files && req.files.length > 0) {
+      // Get current max sort_order
+      const sortResult = await pool.query("SELECT MAX(sort_order) as max_sort FROM photos WHERE product_id = $1", [id]);
+      let nextSortOrder = (sortResult.rows[0]?.max_sort || 0) + 1;
+
+      // Insert new photos
+      const photoPromises = req.files.map((file, index) => {
+        const imagePath = `/uploads/${file.filename}`;
+        return pool.query(
+          "INSERT INTO photos (product_id, image_path, is_primary, sort_order) VALUES ($1, $2, $3, $4)",
+          [id, imagePath, false, nextSortOrder + index]
+        );
+      });
+
+      await Promise.all(photoPromises);
     }
 
-    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');
-    const values = Object.values(updates);
-    values.push(id);
-
-    await pool.query(`UPDATE photos SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`, values);
-
-    res.json({ message: "Photo updated" });
+    res.json({ message: "Product updated successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "DB error" });
@@ -271,25 +290,69 @@ app.patch("/api/photos/:id", requireAuth, upload.single("image"), async (req, re
 });
 
 
-app.delete("/api/photos/:id", requireAuth, async (req, res) => {
+app.delete("/api/products/:id", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
 
-    const result = await pool.query("SELECT image_path FROM photos WHERE id = $1", [id]);
-    const row = result.rows[0];
-    if (!row) return res.status(404).json({ message: "Not found" });
+    // Get all photos for this product to delete files
+    const photosResult = await pool.query("SELECT image_path FROM photos WHERE product_id = $1", [id]);
+    const photos = photosResult.rows;
 
-    // Delete image from Supabase storage
-    if (row.image_path && row.image_path.includes('supabase')) {
-      const fileName = row.image_path.split('/').pop();
-      await supabase.storage.from("hoodies").remove([fileName]);
+    // Delete image files
+    for (const photo of photos) {
+      if (photo.image_path && photo.image_path.startsWith('/uploads/')) {
+        const filePath = path.join(__dirname, photo.image_path);
+        try {
+          await fs.unlink(filePath);
+        } catch (err) {
+          console.error("Error deleting file:", err);
+        }
+      }
     }
 
-    // Delete from database
-    await pool.query("DELETE FROM photos WHERE id = $1", [id]);
+    // Delete product (photos will be deleted automatically due to CASCADE)
+    const deleteResult = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+    if (deleteResult.rowCount === 0) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
-    res.json({ message: "Photo deleted" });
+    res.json({ message: "Product deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "DB error" });
+  }
+});
+
+// Delete individual photo/image from product
+app.delete("/api/products/:id/photos/:photoId", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const photoId = Number(req.params.photoId);
+    if (!id || !photoId) return res.status(400).json({ message: "Invalid id or photoId" });
+
+    // Get the photo to delete file
+    const photoResult = await pool.query("SELECT image_path FROM photos WHERE id = $1 AND product_id = $2", [photoId, id]);
+    const photo = photoResult.rows[0];
+    if (!photo) return res.status(404).json({ message: "Photo not found" });
+
+    // Delete image file
+    if (photo.image_path && photo.image_path.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, photo.image_path);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error("Error deleting file:", err);
+      }
+    }
+
+    // Delete photo record
+    const deleteResult = await pool.query("DELETE FROM photos WHERE id = $1 AND product_id = $2", [photoId, id]);
+    if (deleteResult.rowCount === 0) {
+      return res.status(404).json({ message: "Photo not found" });
+    }
+
+    res.json({ message: "Photo deleted successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "DB error" });
@@ -299,4 +362,7 @@ app.delete("/api/photos/:id", requireAuth, async (req, res) => {
 
 
 const port = Number(process.env.PORT || 5000);
-app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+  testConnection();
+});

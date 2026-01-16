@@ -1,5 +1,14 @@
 {
-  "dependencies": {
-    "better-sqlite3": "^12.6.0"
-  }
+  "name": "stk-shop",
+  "version": "1.0.0",
+  "description": "STK Shop - Photo Gallery Management",
+  "private": true,
+  "scripts": {
+    "start": "cd server && npm start",
+    "dev": "cd server && npm run dev",
+    "install-all": "npm install && cd server && npm install"
+  },
+  "keywords": ["shop", "photos", "gallery"],
+  "author": "",
+  "license": "MIT"
 }
