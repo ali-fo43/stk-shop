@@ -10,7 +10,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from 'fs/promises';
 
-import { pool, testConnection } from "./db.js";
+import { all as dbAll, get as dbGet, run as dbRun, testConnection } from "./db.js";
 import { requireAuth } from "./middleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,9 +53,9 @@ app.use(
 // Test database connection
 app.get("/api/test-db", async (req, res) => {
   try {
-    const result = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
-    const tables = result.rows.map(r => r.table_name);
-    res.json({ tables, photosCount: tables.includes('photos') ? 'Table exists' : 'Table missing' });
+    const tables = dbAll("SELECT name FROM sqlite_master WHERE type='table'");
+    const names = tables.map(t => t.name);
+    res.json({ tables: names, photosCount: names.includes('photos') ? 'Table exists' : 'Table missing' });
   } catch (err) {
     console.error("DB test error:", err);
     res.status(500).json({ error: err.message });
@@ -115,15 +115,20 @@ app.post("/api/auth/register", async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, 10);
-    await pool.query("INSERT INTO customers (email, password_hash) VALUES ($1, $2)", [email.trim(), hash]);
-    res.json({ message: "Customer registered successfully" });
-  } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') { // MySQL duplicate entry
-      res.status(400).json({ message: "Email already exists" });
-    } else {
-      console.error(err);
-      res.status(500).json({ message: "Registration failed" });
+    try {
+      dbRun("INSERT INTO customers (email, password_hash) VALUES (?, ?)", [email.trim(), hash]);
+      res.json({ message: "Customer registered successfully" });
+    } catch (err) {
+      if (err && err.message && err.message.includes('UNIQUE')) {
+        res.status(400).json({ message: "Email already exists" });
+      } else {
+        console.error(err);
+        res.status(500).json({ message: "Registration failed" });
+      }
     }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Registration failed" });
   }
 });
 
@@ -139,8 +144,7 @@ app.post("/api/auth/login", async (req, res) => {
     return res.json({ message: "Admin logged in" });
   } else {
     // Customer login - check DB
-    const result = await pool.query("SELECT password_hash FROM customers WHERE email = $1", [email.trim()]);
-    const row = result.rows[0];
+    const row = dbGet("SELECT password_hash FROM customers WHERE email = ?", [email.trim()]);
     if (!row) return res.status(401).json({ message: "Customer not found. Please register first." });
 
     const ok = await bcrypt.compare(password, row.password_hash);
@@ -164,24 +168,24 @@ app.post("/api/auth/logout", (req, res) => {
 // ---------- Products (public) ----------
 app.get("/api/products", async (req, res) => {
   try {
-    // Get all products
-    const productsResult = await pool.query(`
-      SELECT p.*, STRING_AGG(ph.image_path, ',' ORDER BY ph.sort_order, ph.id) as image_paths,
-             STRING_AGG(ph.id::text, ',' ORDER BY ph.sort_order, ph.id) as photo_ids
+    // Get all products with their photos using SQLite group_concat
+    const rows = dbAll(`
+      SELECT p.id, p.name, p.description, p.price, p.created_at, p.updated_at,
+             group_concat(ph.image_path, ',') as image_paths,
+             group_concat(ph.id, ',') as photo_ids
       FROM products p
       LEFT JOIN photos ph ON p.id = ph.product_id
       GROUP BY p.id
       ORDER BY p.id DESC
     `);
-    const rows = productsResult.rows;
 
     const products = rows.map(row => ({
       id: row.id,
       name: row.name,
       description: row.description,
       price: row.price,
-      images: row.image_paths ? row.image_paths.split(',') : [],
-      photoIds: row.photo_ids ? row.photo_ids.split(',').map(id => parseInt(id)) : [],
+      images: row.image_paths ? String(row.image_paths).split(',') : [],
+      photoIds: row.photo_ids ? String(row.photo_ids).split(',').map(id => parseInt(id)) : [],
       created_at: row.created_at,
       updated_at: row.updated_at
     }));
@@ -202,27 +206,25 @@ app.post("/api/products", requireAuth, uploadMultiple, async (req, res) => {
       return res.status(400).json({ message: "Name and at least one image are required" });
     }
 
-    // Insert product first
-    const productResult = await pool.query(
-      "INSERT INTO products (name, description, price) VALUES ($1, $2, $3) RETURNING id",
+    // Insert product
+    const info = dbRun(
+      "INSERT INTO products (name, description, price) VALUES (?, ?, ?)",
       [name.trim(), description ? description.trim() : null, price ? parseFloat(price) : null]
     );
 
-    const productId = productResult.rows[0].id;
+    const productId = info.lastInsertRowid;
     console.log("Product inserted with ID:", productId);
 
     // Insert photos
-    const photoPromises = req.files.map((file, index) => {
+    for (let index = 0; index < req.files.length; index++) {
+      const file = req.files[index];
       const imagePath = `/uploads/${file.filename}`;
-      const isPrimary = index === 0; // First image is primary
-      return pool.query(
-        "INSERT INTO photos (product_id, image_path, is_primary, sort_order) VALUES ($1, $2, $3, $4)",
+      const isPrimary = index === 0 ? 1 : 0;
+      dbRun(
+        "INSERT INTO photos (product_id, image_path, is_primary, sort_order) VALUES (?, ?, ?, ?)",
         [productId, imagePath, isPrimary, index]
       );
-    });
-
-    await Promise.all(photoPromises);
-    console.log(`Inserted ${req.files.length} photos for product ${productId}`);
+    }
 
     res.json({ message: "Product added successfully" });
   } catch (err) {
@@ -246,8 +248,7 @@ app.patch("/api/products/:id", requireAuth, uploadMultiple, async (req, res) => 
     const { name, description, price } = req.body ?? {};
 
     // Load current product
-    const productResult = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
-    const current = productResult.rows[0];
+    const current = dbGet("SELECT * FROM products WHERE id = ?", [id]);
     if (!current) return res.status(404).json({ message: "Product not found" });
 
     const updates = {};
@@ -267,19 +268,15 @@ app.patch("/api/products/:id", requireAuth, uploadMultiple, async (req, res) => 
     // Handle new photos if uploaded
     if (req.files && req.files.length > 0) {
       // Get current max sort_order
-      const sortResult = await pool.query("SELECT MAX(sort_order) as max_sort FROM photos WHERE product_id = $1", [id]);
-      let nextSortOrder = (sortResult.rows[0]?.max_sort || 0) + 1;
+      const sortRow = dbGet("SELECT MAX(sort_order) as max_sort FROM photos WHERE product_id = ?", [id]);
+      let nextSortOrder = (sortRow?.max_sort || 0) + 1;
 
       // Insert new photos
-      const photoPromises = req.files.map((file, index) => {
+      for (let index = 0; index < req.files.length; index++) {
+        const file = req.files[index];
         const imagePath = `/uploads/${file.filename}`;
-        return pool.query(
-          "INSERT INTO photos (product_id, image_path, is_primary, sort_order) VALUES ($1, $2, $3, $4)",
-          [id, imagePath, false, nextSortOrder + index]
-        );
-      });
-
-      await Promise.all(photoPromises);
+        dbRun("INSERT INTO photos (product_id, image_path, is_primary, sort_order) VALUES (?, ?, ?, ?)", [id, imagePath, 0, nextSortOrder + index]);
+      }
     }
 
     res.json({ message: "Product updated successfully" });
