@@ -1,0 +1,8 @@
+{
+  "customers": [],
+  "products": [],
+  "photos": [],
+  "_nextProductId": 1,
+  "_nextPhotoId": 1,
+  "_nextCustomerId": 1
+}
